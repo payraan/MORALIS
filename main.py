@@ -1,87 +1,113 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import requests
 import os
 import uvicorn
 
 app = FastAPI()
 
-# دریافت API Key از متغیر محیطی
+# مقدار API Key از متغیر محیطی
 MORALIS_API_KEY = os.getenv("MORALIS_API_KEY")
+if not MORALIS_API_KEY:
+    raise ValueError("🚨 MORALIS_API_KEY is not set!")
+
 BASE_URL = "https://solana-gateway.moralis.io"
 HEADERS = {
     "Accept": "application/json",
-    "X-API-Key": MORALIS_API_KEY
+    "X-API-Key": MORALIS_API_KEY,
+    "User-Agent": "Investia-Moralis-API-Bot"
 }
 
 @app.get("/")
 def home():
     return {"message": "✅ API Moralis روی سرور اجرا شده است!"}
 
-# 1. دریافت اطلاعات توکن
+# تابع کمکی برای ارسال درخواست به Moralis
+def fetch_from_moralis(endpoint: str):
+    url = f"{BASE_URL}{endpoint}"
+    response = requests.get(url, headers=HEADERS)
+
+    if response.status_code == 200:
+        return response.json()
+    elif response.status_code == 400:
+        raise HTTPException(status_code=400, detail="❌ Bad Request: Invalid Parameters")
+    elif response.status_code == 401:
+        raise HTTPException(status_code=401, detail="❌ Unauthorized: Invalid API Key")
+    elif response.status_code == 404:
+        raise HTTPException(status_code=404, detail="❌ Not Found: Invalid Token or Wallet Address")
+    else:
+        raise HTTPException(status_code=response.status_code, detail="⚠ Unexpected Error")
+
+# تبدیل مقدار network به 'mainnet' برای جلوگیری از خطای Moralis
+def validate_network(network: str):
+    if network.lower() not in ["mainnet", "solana"]:
+        raise HTTPException(status_code=400, detail="❌ Unsupported network. Use 'mainnet' instead.")
+    return "mainnet"
+
+# 1️⃣ دریافت اطلاعات توکن
 @app.get("/token-info/{network}/{address}")
 def get_token_info(network: str, address: str):
-    url = f"{BASE_URL}/token/{network}/{address}/metadata"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/{address}/metadata")
 
-# 2. دریافت لیست توکن‌های کیف پول
+# 2️⃣ دریافت لیست توکن‌های کیف پول
 @app.get("/wallet-spl-tokens/{network}/{address}")
 def get_wallet_tokens(network: str, address: str):
-    url = f"{BASE_URL}/account/{network}/{address}/tokens"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/account/{network}/{address}/tokens")
 
-# 3. دریافت موجودی SOL در کیف پول
+# 3️⃣ دریافت موجودی SOL در کیف پول
 @app.get("/wallet-sol-balance/{network}/{address}")
 def get_wallet_sol_balance(network: str, address: str):
-    url = f"{BASE_URL}/account/{network}/{address}/balance"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/account/{network}/{address}/balance")
 
-# 4. دریافت پرتفوی کیف پول
+# 4️⃣ دریافت پرتفوی کیف پول
 @app.get("/wallet-portfolio/{network}/{address}")
 def get_wallet_portfolio(network: str, address: str):
-    url = f"{BASE_URL}/account/{network}/{address}/portfolio"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/account/{network}/{address}/portfolio")
 
-# 5. دریافت تاریخچه سواپ‌ها بر اساس توکن
+# 5️⃣ دریافت تاریخچه سواپ‌ها بر اساس توکن
 @app.get("/token-swaps/{network}/{address}")
 def get_token_swaps(network: str, address: str):
-    url = f"{BASE_URL}/token/{network}/{address}/swaps"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/{address}/swaps")
 
-# 6. دریافت تاریخچه سواپ‌ها بر اساس کیف پول
+# 6️⃣ دریافت تاریخچه سواپ‌ها بر اساس کیف پول
 @app.get("/wallet-swaps/{network}/{address}")
 def get_wallet_swaps(network: str, address: str):
-    url = f"{BASE_URL}/account/{network}/{address}/swaps"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/account/{network}/{address}/swaps")
 
-# 7. دریافت تاریخچه سواپ‌ها بر اساس جفت معاملاتی
+# 7️⃣ دریافت تاریخچه سواپ‌ها بر اساس جفت معاملاتی
 @app.get("/pair-swaps/{network}/{pair_address}")
 def get_pair_swaps(network: str, pair_address: str):
-    url = f"{BASE_URL}/token/{network}/pairs/{pair_address}/swaps"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/pairs/{pair_address}/swaps")
 
-# 8. دریافت اطلاعات نقدینگی جفت معاملاتی و قیمت توکن
+# 8️⃣ دریافت اطلاعات نقدینگی و قیمت توکن
 @app.get("/token-price/{network}/{address}")
 def get_token_price(network: str, address: str):
-    url = f"{BASE_URL}/token/{network}/{address}/price"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/{address}/price")
 
-# 9. دریافت اطلاعات جفت معاملاتی
+# 9️⃣ دریافت اطلاعات جفت معاملاتی
 @app.get("/token-pairs/{network}/{address}")
 def get_token_pairs(network: str, address: str):
-    url = f"{BASE_URL}/token/{network}/{address}/pairs"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/{address}/pairs")
 
-# 10. دریافت اطلاعات OHLCV (کندل‌ها)
+# 🔟 دریافت اطلاعات OHLCV (کندل‌ها)
 @app.get("/pair-ohlcv/{network}/{pair_address}")
 def get_pair_ohlcv(network: str, pair_address: str, timeframe: str = "1h"):
-    url = f"{BASE_URL}/token/{network}/pairs/{pair_address}/ohlcv?timeframe={timeframe}"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/pairs/{pair_address}/ohlcv?timeframe={timeframe}")
 
-# 11. دریافت اطلاعات Snipers
+# 1️⃣1️⃣ دریافت اطلاعات Snipers
 @app.get("/pair-snipers/{network}/{pair_address}")
 def get_pair_snipers(network: str, pair_address: str, blocks_after_creation: int = 1000):
-    url = f"{BASE_URL}/token/{network}/pairs/{pair_address}/snipers?blocksAfterCreation={blocks_after_creation}"
-    return requests.get(url, headers=HEADERS).json()
+    network = validate_network(network)
+    return fetch_from_moralis(f"/token/{network}/pairs/{pair_address}/snipers?blocksAfterCreation={blocks_after_creation}")
 
 # اجرای سرور با دریافت پورت از متغیر محیطی
 if __name__ == "__main__":
