@@ -85,5 +85,5 @@ def get_pair_snipers(network: str, pair_address: str, blocks_after_creation: int
 
 # اجرای سرور با دریافت پورت از متغیر محیطی
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5110))  # مقدار پیش‌فرض 5110 برای اجرا در لوکال
+    port = int(os.getenv("PORT", 8080)) 
     uvicorn.run(app, host="0.0.0.0", port=port)
